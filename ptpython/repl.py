@@ -35,6 +35,7 @@ from prompt_toolkit.shortcuts import clear_title, print_formatted_text, set_titl
 from prompt_toolkit.utils import DummyContext
 from pygments.lexers import PythonLexer, PythonTracebackLexer
 from pygments.token import Token
+from import_expression import compile, _parse_eval_exec_args
 
 from .eventloop import inputhook
 from .python_input import PythonInput
@@ -167,7 +168,7 @@ class PythonRepl(PythonInput):
             # Try eval first
             try:
                 code = compile_with_flags(line, "eval")
-                result = eval(code, self.get_globals(), self.get_locals())
+                result = eval(code, *_parse_eval_exec_args(self.get_globals(), self.get_locals()))
 
                 locals: Dict[str, Any] = self.get_locals()
                 locals["_"] = locals["_%i" % self.current_statement_index] = result

@@ -1,4 +1,5 @@
 from prompt_toolkit.validation import ValidationError, Validator
+from import_expression import compile
 
 __all__ = ["PythonValidator"]
 
