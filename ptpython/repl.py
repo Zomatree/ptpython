@@ -12,9 +12,11 @@ import builtins
 import os
 import sys
 import traceback
+import inspect
 import warnings
+import signal
+import ast
 from typing import Any, Callable, ContextManager, Dict, Optional
-
 from prompt_toolkit.document import Document
 from prompt_toolkit.formatted_text import (
     FormattedText,
@@ -41,6 +43,39 @@ from .eventloop import inputhook
 from .python_input import PythonInput
 
 __all__ = ["PythonRepl", "enable_deprecation_warnings", "run_config", "embed"]
+
+
+async def interruptable(co):
+    loop = asyncio.get_running_loop()
+    interrupted = loop.create_future()
+
+    def signal_handler(signal, frame):
+        loop = interrupted.get_loop()
+
+        async def _finish():
+            interrupted.set_result(True)
+
+        asyncio.run_coroutine_threadsafe(_finish(), loop=loop)
+
+    orig_handler = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    task = asyncio.create_task(co)
+    done, pending = await asyncio.wait(
+        [task, interrupted], return_when=asyncio.FIRST_COMPLETED
+    )
+    signal.signal(signal.SIGINT, orig_handler)
+
+    if interrupted in done:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError as e:
+            # TODO figure out a way to get the original traceback
+            return e
+    elif task in done:
+        interrupted.cancel()
+        return task.result()
 
 
 class PythonRepl(PythonInput):
@@ -108,12 +143,12 @@ class PythonRepl(PythonInput):
                 # Abort - try again.
                 self.default_buffer.document = Document()
             else:
-                self._process_text(text)
+                await self._process_text(text)
 
         if self.terminal_title:
             clear_title()
 
-    def _process_text(self, line: str) -> None:
+    async def _process_text(self, line: str) -> None:
 
         if line and not line.isspace():
             if self.insert_blank_line_after_input:
@@ -121,7 +156,7 @@ class PythonRepl(PythonInput):
 
             try:
                 # Eval and print.
-                self._execute(line)
+                await self._execute(line)
             except KeyboardInterrupt as e:  # KeyboardInterrupt doesn't inherit from Exception.
                 self._handle_keyboard_interrupt(e)
             except Exception as e:
@@ -133,7 +168,7 @@ class PythonRepl(PythonInput):
             self.current_statement_index += 1
             self.signatures = []
 
-    def _execute(self, line: str) -> None:
+    async def _execute(self, line: str) -> None:
         """
         Evaluate the line and print the result.
         """
@@ -165,10 +200,15 @@ class PythonRepl(PythonInput):
             # Run as shell command
             os.system(line[1:])
         else:
+            result = None
             # Try eval first
+            args = _parse_eval_exec_args(self.get_globals(), self.get_locals())
             try:
                 code = compile_with_flags(line, "eval")
-                result = eval(code, *_parse_eval_exec_args(self.get_globals(), self.get_locals()))
+                result = eval(code, *args)
+
+                if code.co_flags & inspect.CO_COROUTINE:
+                    result = await interruptable(result)
 
                 locals: Dict[str, Any] = self.get_locals()
                 locals["_"] = locals["_%i" % self.current_statement_index] = result
@@ -178,7 +218,9 @@ class PythonRepl(PythonInput):
             # If not a valid `eval` expression, run using `exec` instead.
             except SyntaxError:
                 code = compile_with_flags(line, "exec")
-                exec(code, self.get_globals(), self.get_locals())
+                result = eval(code, *args)
+                if code.co_flags & inspect.CO_COROUTINE:
+                    await interruptable(result)
 
     def show_result(self, result: object) -> None:
         """

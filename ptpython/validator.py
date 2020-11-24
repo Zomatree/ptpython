@@ -1,5 +1,6 @@
 from prompt_toolkit.validation import ValidationError, Validator
 from import_expression import compile
+from ast import PyCF_ALLOW_TOP_LEVEL_AWAIT
 
 __all__ = ["PythonValidator"]
 
@@ -36,7 +37,7 @@ class PythonValidator(Validator):
                 flags = self.get_compiler_flags()
             else:
                 flags = 0
-
+            flags |= PyCF_ALLOW_TOP_LEVEL_AWAIT
             compile(text, "<input>", "exec", flags=flags, dont_inherit=True)
         except SyntaxError as e:
             # Note, the 'or 1' for offset is required because Python 2.7

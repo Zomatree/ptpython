@@ -7,7 +7,7 @@ import __future__
 from asyncio import get_event_loop
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, List, Optional, TypeVar
-
+from ast import PyCF_ALLOW_TOP_LEVEL_AWAIT
 from prompt_toolkit.application import Application, get_app
 from prompt_toolkit.auto_suggest import (
     AutoSuggestFromHistory,
@@ -389,7 +389,7 @@ class PythonInput:
         Give the current compiler flags by looking for _Feature instances
         in the globals.
         """
-        flags = 0
+        flags = PyCF_ALLOW_TOP_LEVEL_AWAIT
 
         for value in self.get_globals().values():
             try:
