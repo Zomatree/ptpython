@@ -149,7 +149,12 @@ navigation mode.
 Configuration
 *************
 
-It is possible to create a ``$XDG_CONFIG_HOME/ptpython/config.py`` file to customize the configuration.
+It is possible to create a ``config.py`` file to customize configuration.
+ptpython will look in an appropriate platform-specific directory via `appdirs
+<https://pypi.org/project/appdirs/>`. See the ``appdirs`` documentation for the
+precise location for your platform. A ``PTPYTHON_CONFIG_HOME`` environment
+variable, if set, can also be used to explicitly override where configuration
+is looked for.
 
 Have a look at this example to see what is possible:
 `config.py <https://github.com/jonathanslenders/ptpython/blob/master/examples/ptpython_config/config.py>`_
@@ -226,7 +231,6 @@ Special thanks to
 
 - `Pygments <http://pygments.org/>`_: Syntax highlighter.
 - `Jedi <http://jedi.jedidjah.ch/en/latest/>`_: Autocompletion library.
-- `Docopt <http://docopt.org/>`_: Command-line interface description language.
 - `wcwidth <https://github.com/jquast/wcwidth>`_: Determine columns needed for a wide characters.
 - `prompt_toolkit <http://github.com/jonathanslenders/python-prompt-toolkit>`_ for the interface.
 
